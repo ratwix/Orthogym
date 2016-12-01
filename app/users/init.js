@@ -1,18 +1,8 @@
-require('./model');
-const passport = require('passport');
+const User = require('./model');
 
-function initUser (app) {
-  app.get('/freeTour', passport.authenticationMiddleware(), renderProfile)
-  app.post('/login', passport.authenticate('local', {
-    successRedirect: '/freeTour',
-    failureRedirect: '/'
-  }))
-}
-
-function renderWelcomeFree (req, res) {
-  res.render('user/profile', {
-    username: req.user.username
-  })
+function initUser() {
+  //Init model
+  User.init();
 }
 
 module.exports = initUser

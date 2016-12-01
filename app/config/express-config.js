@@ -1,6 +1,8 @@
 const exphbs  = require('express-handlebars');
 const passport = require('passport')
 const session = require('express-session');
+const flash = require('connect-flash');
+const cookieParser = require('cookie-parser');
 const sessionFileStore = require('session-file-store')(session);
 
 (function (expressConfig) {
@@ -47,10 +49,14 @@ const sessionFileStore = require('session-file-store')(session);
     var bodyParser = require('body-parser');
     app.use(bodyParser.urlencoded({ extended: true }));
     app.use(bodyParser.json());
+    app.use(cookieParser());
 
     logger.debug("Initialize passport");
     app.use(passport.initialize())
     app.use(passport.session())
+
+    logger.debug("Initialize flash");
+    app.use(flash());
 
     logger.debug("Overriding 'Express' logger");
     app.use(require('morgan')("combined", { "stream": logger.stream }));
