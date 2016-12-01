@@ -1,0 +1,35 @@
+{
+  "name": "orthogym",
+  "version": "1.0.0",
+  "description": "Orthographe et grammaire",
+  "main": "index.js",
+  "dependencies": {
+    "async": "^2.1.4",
+    "body-parser": "^1.15.2",
+    "compression": "^1.6.2",
+    "express": "^4.14.0",
+    "express-handlebars": "^3.0.0",
+    "express-session": "^1.14.2",
+    "express-validator": "^3.0.0",
+    "lodash": "^4.17.2",
+    "mangodb": "^1.0.0",
+    "mongodb": "^2.2.11",
+    "mongoose": "^4.7.0",
+    "morgan": "^1.7.0",
+    "passport": "^0.3.2",
+    "passport-local": "^1.0.0",
+    "session-file-store": "^1.0.0",
+    "winston": "^2.3.0"
+  },
+  "devDependencies": {
+    "mocha": "^3.1.2",
+    "nodemon": "^1.11.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js",
+    "watch": "nodemon index.js"
+  },
+  "author": "Charles Rathouis",
+  "license": "ISC"
+}
