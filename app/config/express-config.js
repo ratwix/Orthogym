@@ -3,7 +3,9 @@ const passport = require('passport')
 const session = require('express-session');
 const flash = require('connect-flash');
 const cookieParser = require('cookie-parser');
+const mailer = require('express-mailer');
 const sessionFileStore = require('session-file-store')(session);
+
 
 (function (expressConfig) {
 
@@ -22,6 +24,20 @@ const sessionFileStore = require('session-file-store')(session);
       resave: true,
       store: new sessionFileStore()
     }));
+
+    logger.debug("Initialize mailer");
+    var mailConfig = require('./mail-config');
+    mailer.extend(app, {
+      from: mailConfig.from,
+      host: mailConfig.smtp, // hostname
+      secureConnection: true, // use SSL
+      port: mailConfig.port, // port for secure SMTP
+      transportMethod: 'SMTP', // default is SMTP. Accepts anything that nodemailer accepts
+      auth: {
+        user: mailConfig.user,
+        pass: mailConfig.password
+      }
+    });
 
     //Set up handelbar
     app.engine('.hbs', exphbs({

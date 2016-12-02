@@ -21,7 +21,11 @@ var userSchema = mongoose.Schema({
     admin           : { type: Boolean, default: false },
     admin_content   : { type: Boolean, default: false },
     corporate       : { type: Boolean, default: false },
-    member          : { type: Boolean, default: false }
+    member          : { type: Boolean, default: false },
+    resetToken      : {
+      resetPasswordToken : String,
+      resetPasswordExpires : Date
+    }
 });
 
 // methods ======================

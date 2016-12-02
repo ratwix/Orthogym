@@ -1,6 +1,9 @@
+const async = require('async');
+const crypto = require('crypto');
 var LocalStrategy   = require('passport-local').Strategy;
 var User            = require('../users').user;
 var passport        = require('passport');
+const logger = require("../config/logger-config");
 
 function initPassport() {
   passport.serializeUser(function(user, done) {
@@ -118,7 +121,7 @@ function initAuthenticationRoute(app) {
   });
 
   app.post('/signup', passport.authenticate('local-signup', {
-        successRedirect : '/home', // redirect to the secure profile section. //TODO callback for different kind of signup (free, user, admin, corporate)
+        successRedirect : '/home', // redirect to the secure profile section.
         failureRedirect : '/signup', // redirect back to the signup page if there is an error
         failureFlash : true // allow flash messages
     }));
@@ -126,6 +129,68 @@ function initAuthenticationRoute(app) {
   app.get('/logout', function(req, res) {
     req.logout();
     res.redirect('/');
+  });
+
+  app.post('/forgot', function(req, res) {
+      var email = req.body.email;
+      logger.debug('Forgot email:' + email);
+
+      async.waterfall([
+        function(done) { //Check if an email is passed
+          logger.debug('Test if email exist');
+          if (!email || email === '') {
+            req.flash('loginMessage', 'Veuillez renseigner votre email.');
+            return res.redirect('/');
+          }
+          done();
+        },
+        function(done) { //generating a hash key
+          logger.debug('Generate Crypto token');
+          crypto.randomBytes(20, function(err, buf) {
+            var token = buf.toString('hex');
+            done(err, token);
+          });
+        },
+        function(token, done) { //Update user with token
+          logger.debug('Get the user and update token');
+          User.findOne({ email: email }, function(err, user) {
+            if (!user) {
+              logger.debug('User not found');
+              req.flash('loginMessage', 'Aucun utilisateur avec cet email');
+              return res.redirect('/');
+            }
+            user.resetToken.resetPasswordToken = token;
+            user.resetToken.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+            user.save(function(err) {
+              done(err, token, user);
+            });
+          });
+        },
+        function(token, user, done) {
+          logger.debug('Send email');
+          app.mailer.send('views/mails/mail-reset-password', {
+            to: 'charles.rathouis@gmail.com', //TODO: user mails
+            subject:'Orthogym : réinitialisation du mot de passe',
+            host:req.headers.host,
+            token:token,
+            email:email
+          }, function (err, message) {
+            if (err) {
+              // handle error
+              logger.error('Error sending email' + err);
+            }
+            done(err, 'done');
+          });
+        }
+      ],
+      function(err) {
+        if (err) {
+          req.flash('loginMessage', 'Une erreur est survenur' + err);
+        } else {
+          req.flash('loginMessage', 'Un email vous a été envoyé');
+        }
+        return res.redirect("/");
+      })
   });
 
   //Loggin action, define different rendering depending of the profile of user
@@ -147,9 +212,6 @@ function initAuthenticationRoute(app) {
           user : req.user // get the user out of session and pass to template
       });
     }
-
-
-
   });
 }
 // route middleware to make sure a user is logged as free user
