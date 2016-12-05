@@ -22,7 +22,7 @@ const sessionFileStore = require('session-file-store')(session);
       secret: 'orthogym session secret',
       saveUninitialized: true,
       resave: true,
-      store: new sessionFileStore()
+//      store: new sessionFileStore()
     }));
 
     logger.debug("Initialize mailer");

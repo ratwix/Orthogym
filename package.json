@@ -23,6 +23,7 @@
     "passport": "^0.3.2",
     "passport-facebook": "^2.1.1",
     "passport-google-oauth": "^1.0.0",
+    "passport-hash": "^0.6.0",
     "passport-local": "^1.0.0",
     "session-file-store": "^1.0.0",
     "winston": "^2.3.0"
@@ -34,7 +35,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
-    "watch": "nodemon index.js"
+    "watch": "nodemon index.js",
+    "debug": "node-debug index.js --debug-brk"
   },
   "author": "Charles Rathouis",
   "license": "ISC"

@@ -1,9 +1,13 @@
 const async = require('async');
 const crypto = require('crypto');
+const logger = require("../config/logger-config");
+const configAuth = require('../config/auth-config');
 var LocalStrategy   = require('passport-local').Strategy;
+var FacebookStrategy = require('passport-facebook').Strategy;
+var GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
 var User            = require('../users').user;
 var passport        = require('passport');
-const logger = require("../config/logger-config");
+
 
 function initPassport() {
   passport.serializeUser(function(user, done) {
@@ -38,7 +42,7 @@ function initPassport() {
               }
               // check to see if theres already a user with that email
               if (user) {
-                return done(null, false, req.flash('signupMessage', 'Cet email est déjà utilisé.'));
+                return done(null, false, req.flash('signupMessageError', 'Cet email est déjà utilisé.'));
               } else {
                 // if there is no user with that email
                 // create the user
@@ -49,11 +53,11 @@ function initPassport() {
                 if (req.body.userType == 'free') {
 
                 } else if (req.body.userType == 'member') {
-                    newUser.member = true;
+                    newUser.role.member = true;
                 } else if (req.body.userType == 'admin') {
-                    newUser.admin = true;
+                    newUser.role.admin = true;
                 } else if (req.body.userType == 'corporate') {
-                    newUser.corporate = true;
+                    newUser.role.corporate = true;
                 }
                 // save the user
                 newUser.save(function(err) {
@@ -85,17 +89,150 @@ function initPassport() {
                 return done(err);
             // if no user is found, return the message
             if (!user)
-                return done(null, false, req.flash('loginMessage', 'Utilisateur inconnu.')); // req.flash is the way to set flashdata using connect-flash
+                return done(null, false, req.flash('loginMessageError', 'Utilisateur inconnu.')); // req.flash is the way to set flashdata using connect-flash
 
             // if the user is found but the password is wrong
             if (!user.validPassword(password))
-                return done(null, false, req.flash('loginMessage', 'Mauvais mot de passe.')); // create the loginMessage and save it to session as flashdata
+                return done(null, false, req.flash('loginMessageError', 'Mauvais mot de passe.')); // create the loginMessage and save it to session as flashdata
 
             // all is well, return successful user
             return done(null, user);
         });
     }));
 }
+
+///////////////////////////////////////
+// Facebook login
+///////////////////////////////////////
+
+passport.use(new FacebookStrategy({
+        // pull in our app id and secret from our auth.js file
+        clientID        : configAuth.facebookAuth.clientID,
+        clientSecret    : configAuth.facebookAuth.clientSecret,
+        callbackURL     : configAuth.facebookAuth.callbackURL,
+        profileFields: ['id', 'displayName', 'emails', 'name']
+    },
+    // facebook will send back the token and profile
+    function(token, refreshToken, profile, done) {
+      // asynchronous
+      process.nextTick(function() {
+        // find the user in the database based on their facebook id
+          logger.debug("Authentifié avec Facebook recherche d'un element dans la base");
+          User.findOne({ 'facebook.id' : profile.id }, function(err, user) {
+            // if there is an error, stop everything and return that
+            // ie an error connecting to the database
+            if (err)
+                return done(err);
+            // if the user is found, then log them in
+            if (user) {
+                logger.debug("Pas de user avec cet id dans la base");
+                return done(null, user); // user found, return that user
+            } else {
+                // if there is no user found with that facebook id, check if a user with the same email already exists
+                logger.debug("Recherche d'un user avec l'email " + profile.emails[0].value);
+                var mail = profile.emails[0].value;
+                User.findOne({'email' : mail}, function(err, user_mail) {
+                  if (err)
+                    return done(err);
+                    //a user exist with the facebook email. Attach the facebook id to this email
+                  if (user_mail) {
+                    logger.debug("Il y a un user avec cet email : mise a jour");
+                    user_mail.facebook.id = profile.id;
+                    user_mail.facebook.token = token;
+                    user_mail.facebook.name = profile.name.givenName + ' ' + profile.name.familyName;
+                    user_mail.save(function(err) {
+                        if (err)
+                            throw err;
+                        // if successful, return the new user
+                        return done(null, user_mail);
+                    });
+                  } else { //no user found. Create a new user
+                    logger.debug("Creation d'un nouvel user");
+                    var newUser            = new User();
+                    // set all of the facebook information in our user model
+                    newUser.facebook.id    = profile.id; // set the users facebook id
+                    newUser.facebook.token = token; // we will save the token that facebook provides to the user
+                    newUser.facebook.name  = profile.name.givenName + ' ' + profile.name.familyName; // look at the passport user profile to see how names are returned
+                    newUser.email = profile.emails[0].value; // facebook can return multiple emails so we'll take the first
+                    // save our user to the database
+                    newUser.save(function(err) {
+                        if (err)
+                            throw err;
+                        // if successful, return the new user
+                        return done(err, newUser);
+                    });
+                  }
+                });
+            }
+          });
+      });
+  }));
+
+  ///////////////////////////////////////
+  // Google login
+  ///////////////////////////////////////
+
+  passport.use(new GoogleStrategy({
+          // pull in our app id and secret from our auth.js file
+          clientID        : configAuth.googleAuth.clientID,
+          clientSecret    : configAuth.googleAuth.clientSecret,
+          callbackURL     : configAuth.googleAuth.callbackURL,
+      },
+      // facebook will send back the token and profile
+      function(token, refreshToken, profile, done) {
+        // asynchronous
+        process.nextTick(function() {
+          // find the user in the database based on their facebook id
+            logger.debug("Authentifié avec Google  recherche d'un element dans la base");
+            User.findOne({ 'google.id' : profile.id }, function(err, user) {
+              // if there is an error, stop everything and return that
+              // ie an error connecting to the database
+              if (err)
+                  return done(err);
+              // if the user is found, then log them in
+              if (user) {
+                  logger.debug("Pas de user avec cet id dans la base");
+                  return done(null, user); // user found, return that user
+              } else {
+                  // if there is no user found with that facebook id, check if a user with the same email already exists
+                  logger.debug("Recherche d'un user avec l'email " + profile.emails[0].value);
+                  var mail = profile.emails[0].value;
+                  User.findOne({'email' : mail}, function(err, user_mail) {
+                    if (err)
+                      return done(err);
+                      //a user exist with the google email. Attach the facebook id to this email
+                    if (user_mail) {
+                      logger.debug("Il y a un user avec cet email : mise a jour");
+                      user_mail.google.id = profile.id;
+                      user_mail.google.token = token;
+                      user_mail.google.name = profile.displayName;
+                      user_mail.save(function(err) {
+                          if (err)
+                              throw err;
+                          // if successful, return the new user
+                          return done(null, user_mail);
+                      });
+                    } else { //no user found. Create a new user
+                      logger.debug("Creation d'un nouvel user");
+                      var newUser            = new User();
+                      // set all of the facebook information in our user model
+                      newUser.google.id    = profile.id; // set the users google id
+                      newUser.google.token = token; // we will save the token that facebook provides to the user
+                      newUser.google.name  = profile.displayName; // look at the passport user profile to see how names are returned
+                      newUser.email = profile.emails[0].value; // facebook can return multiple emails so we'll take the first
+                      // save our user to the database
+                      newUser.save(function(err) {
+                          if (err)
+                              throw err;
+                          // if successful, return the new user
+                          return done(err, newUser);
+                      });
+                    }
+                  });
+              }
+            });
+        });
+    }));
 
 function initAuthenticationRoute(app) {
   function loggedUserRoute(err, user, info) {
@@ -117,7 +254,7 @@ function initAuthenticationRoute(app) {
 
   app.get('/signup', function(req, res) {
         // render the page and pass in any flash data if it exists
-        res.render('views/authentication/signup', { message: req.flash('signupMessage') });
+        res.render('views/authentication/signup', { message_error: req.flash('signupMessageError') });
   });
 
   app.post('/signup', passport.authenticate('local-signup', {
@@ -125,6 +262,23 @@ function initAuthenticationRoute(app) {
         failureRedirect : '/signup', // redirect back to the signup page if there is an error
         failureFlash : true // allow flash messages
     }));
+
+  app.get('/auth/facebook', passport.authenticate('facebook', { scope : 'email' }));
+
+  app.get('/auth/facebook/callback',
+          passport.authenticate('facebook', {
+              successRedirect : '/home',
+              failureRedirect : '/'
+  }));
+
+  app.get('/auth/google', passport.authenticate('google', { scope : ['profile', 'email'] }));
+
+  // the callback after google has authenticated the user
+  app.get('/auth/google/callback',
+          passport.authenticate('google', {
+                  successRedirect : '/home',
+                  failureRedirect : '/'
+  }));
 
   app.get('/logout', function(req, res) {
     req.logout();
@@ -139,7 +293,7 @@ function initAuthenticationRoute(app) {
         function(done) { //Check if an email is passed
           logger.debug('Test if email exist');
           if (!email || email === '') {
-            req.flash('loginMessage', 'Veuillez renseigner votre email.');
+            req.flash('loginMessageError', 'Veuillez renseigner votre email.');
             return res.redirect('/');
           }
           done();
@@ -156,7 +310,7 @@ function initAuthenticationRoute(app) {
           User.findOne({ email: email }, function(err, user) {
             if (!user) {
               logger.debug('User not found');
-              req.flash('loginMessage', 'Aucun utilisateur avec cet email');
+              req.flash('loginMessageError', 'Aucun utilisateur avec cet email');
               return res.redirect('/');
             }
             user.resetToken.resetPasswordToken = token;
@@ -185,25 +339,80 @@ function initAuthenticationRoute(app) {
       ],
       function(err) {
         if (err) {
-          req.flash('loginMessage', 'Une erreur est survenur' + err);
+          req.flash('loginMessageError', 'Une erreur est survenur' + err);
         } else {
-          req.flash('loginMessage', 'Un email vous a été envoyé');
+          req.flash('loginMessageSuccess', 'Un email vous a été envoyé');
         }
         return res.redirect("/");
       })
   });
 
+  //Reset token checking
+  app.get('/reset/:token', function(req, res) {
+    User.findOne({ "resetToken.resetPasswordToken": req.params.token, "resetToken.resetPasswordExpires": { $gt: Date.now() } }, function(err, user) {
+      if (!user) {
+        req.flash('loginMessageError', 'Demande invalide ou expiré.');
+        return res.redirect('/');
+      }
+      res.render('views/authentication/authentication-reset-password', {
+        user: user
+      });
+    });
+  });
+
+  //Reset password and send email
+  app.post('/reset/:token', function(req, res) {
+    async.waterfall([
+      function(done) {
+        User.findOne({ "resetToken.resetPasswordToken": req.params.token, "resetToken.resetPasswordExpires": { $gt: Date.now() } }, function(err, user) {
+          if (!user) {
+            logger.debug('Pas trouve utilisateur');
+            req.flash('loginMessageError', 'Demande invalide ou expiré 2.');
+            return res.redirect('/');
+          }
+          logger.debug('Changement du mot de passe');
+          user.local.password = user.generateHash(req.body.password);
+          user.resetToken.resetPasswordToken = undefined;
+          user.resetToken.resetPasswordExpires = undefined;
+
+          user.save(function(err) {
+            req.logIn(user, function(err) {
+              done(err, user);
+            });
+          });
+        });
+      },
+      function(user, done) {
+        logger.debug('Send email confirmation');
+        app.mailer.send('views/mails/mail-reset-password-confirm', {
+          to: 'charles.rathouis@gmail.com', //TODO: user mails
+          subject:'Orthogym : réinitialisation du mot de passe',
+          email:user.email
+        }, function (err, message) {
+          if (err) {
+            // handle error
+            logger.error('Error sending email' + err);
+          }
+          req.flash('loginMessageSuccess', 'Votre mot de passe a été réinitialisé.');
+          done(err, 'done');
+        });
+      }
+    ], function(err) {
+      res.redirect('/');
+    });
+  });
+
   //Loggin action, define different rendering depending of the profile of user
   app.get('/home', isLoggedIn, function(req, res) {
-    if (req.user.member) {
+    if (req.user.role.member) {
       res.render('views/welcome/welcome-logged-member', {
           user : req.user // get the user out of session and pass to template
       });
-    } else if (req.user.admin) {
+    } else if (req.user.role.admin) {
       res.render('views/welcome/welcome-logged-admin', {
           user : req.user // get the user out of session and pass to template
       });
-    } else if (req.user.corporate) {
+    } else if (req.user.role.corporate) {
       res.render('views/welcome/welcome-logged-corporate', {
           user : req.user // get the user out of session and pass to template
       });

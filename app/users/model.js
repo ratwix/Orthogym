@@ -18,10 +18,12 @@ var userSchema = mongoose.Schema({
       token         : String,
       name          : String
     },
-    admin           : { type: Boolean, default: false },
-    admin_content   : { type: Boolean, default: false },
-    corporate       : { type: Boolean, default: false },
-    member          : { type: Boolean, default: false },
+    role            : {
+      admin           : { type: Boolean, default: false },
+      admin_content   : { type: Boolean, default: false },
+      corporate       : { type: Boolean, default: false },
+      member          : { type: Boolean, default: false }
+    },
     resetToken      : {
       resetPasswordToken : String,
       resetPasswordExpires : Date

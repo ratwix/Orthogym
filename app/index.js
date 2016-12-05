@@ -27,7 +27,10 @@ app.get('/', (request, response) => {
   if (request.isAuthenticated()) {
     response.redirect('/home');
   } else {
-    response.render('views/welcome/welcome-non-autenticate', { message: request.flash('loginMessage') });
+    response.render('views/welcome/welcome-non-autenticate', {
+      message_success : request.flash('loginMessageSuccess') ,
+      message_error   : request.flash('loginMessageError')
+    });
   }
 })
 
